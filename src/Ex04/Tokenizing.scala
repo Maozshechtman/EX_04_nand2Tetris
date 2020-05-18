@@ -1,15 +1,20 @@
 package Ex04
-import scala.xml._
-import scala.reflect.io.File
-class Tokenizing(jackFile:File=null) {
-  private final val keyWords= Array("class",
-  
-  "constructor " ,
-  "function " ,
-  "method " ,
-  "field " ,
-  "static " ,
-  "var " ,
+
+import java.io.{File, FileOutputStream, PrintWriter}
+
+import scala.io.Source
+import scala.util.control.Breaks._
+
+class Tokenizing(jackFile: File = null) {
+  //Atribute
+  private final val keyWords = Array("class",
+
+    "constructor ",
+    "function ",
+    "method ",
+    "field ",
+    "static ",
+    "var ",
   "int " ,
   "char " ,
   "boolean " ,
@@ -29,23 +34,43 @@ class Tokenizing(jackFile:File=null) {
   "," ,
   ";"
    ,
-  "+" ,
-    "-" ,
-    "*" ,
-    "/" ,
-    "&" ,
-    "|" ,
-    "<" ,
-    ">" ,
-    "=" ,
+    "+",
+    "-",
+    "*",
+    "/",
+    "&",
+    "|",
+    "<",
+    ">",
+    "=",
     "~")
+  private val tokenArray = Array[String]()
 
-  private var tokenArray=Array()
-  private def createXMlElement(tokName:String,tok:String):scala.xml.Elem = <tokName>tok</tokName>
-  private  def writeXMltokens(elements:Array[Elem]): Unit ={
-    val root:Elem= <tokens> elements </tokens>
+  def parser(): Unit = {
+
+    for (line <- Source.fromFile(jackFile).getLines()) {
+      breakable {
+        if (line.startsWith("//")) break
+
+      }
+
+    }
+
+
   }
 
+  private def createXMlToken(tokPattren: String, tokName: String): String =
+    "<" + tokPattren + ">" + tokName + "</" + tokPattren + ">"
+
+  private def writeXMlTokens(): Unit = {
+
+    val fileName = jackFile.getPath.replaceAll(".jack", "TMaG.xml")
+    val root = "<tokens>" + tokenArray.mkString("\n") + "\n" + "</tokens>"
+    val writer = new PrintWriter(new FileOutputStream(fileName, true))
+    writer.append(root)
+    writer.close()
+
+  }
 
 
 }
