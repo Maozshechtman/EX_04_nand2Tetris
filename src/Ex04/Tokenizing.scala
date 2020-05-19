@@ -3,7 +3,6 @@ package Ex04
 import java.io.{File, FileOutputStream, PrintWriter}
 
 import scala.io.Source
-import scala.util.control.Breaks.{break, breakable}
 
 case class Tokenizing(jackFile: File = null) {
   //Atribute
@@ -47,31 +46,56 @@ case class Tokenizing(jackFile: File = null) {
   private val tokenArray = Array[String]()
 
   def parser(): Unit = {
-    //comment case (move to  the next line)
-    for (line <- Source.fromFile(jackFile).getLines()) {
-      breakable {
-        // case of double back slash
-        if (line.startsWith("//")) break
-        else if (line.contains("//")) {
-          lineToTokens(line.split("//")(0))
-
-        }
-
-        else if (line.startsWith("/*"))
-          while (!line.endsWith("*/")) break
-        else if (line.contains("/*")) {
-          lineToTokens(line.split("/*")(0))
-          while (!line.endsWith("*/")) break
-        }
-
-
-      }
-    }
+    //remove comments
+    println("raed form :" + jackFile.getName)
+    val code = removeComments(jackFile)
+    for (line <- code) println(line)
 
   }
 
-
   private def lineToTokens(line: String) {
+
+  }
+
+  private def removeComments(file: File): Array[String] = {
+
+
+    def removeSinglecomment(line: String) = if (line.indexOf("//") != -1)
+      line.substring(0, line.indexOf("//"))
+    else
+      line
+
+    def removeBlockComments(strIn: String): String = {
+      var startIndex = strIn.indexOf("/**")
+
+      if (startIndex == -1) return strIn
+
+      var result = strIn
+
+      var endIndex = strIn.indexOf("*/")
+      if (startIndex == 0 && endIndex == -1) {
+        return ""
+      }
+      while ( {
+        startIndex != -1
+      }) {
+
+        if (endIndex == -1) return strIn.substring(0, startIndex - 1)
+        result = result.substring(0, startIndex) + result.substring(endIndex + 2)
+        startIndex = result.indexOf("/**")
+        endIndex = result.indexOf("*/")
+      }
+      return result
+
+    }
+
+
+    var finalCode = Source.fromFile(file).getLines().map(line => removeSinglecomment(line)).toArray
+    finalCode = finalCode.filterNot(x => x.equals("")).toArray
+    finalCode = finalCode.map(line => removeBlockComments(line)).toArray
+
+
+    return finalCode.filterNot(str => str.equals("") || str.startsWith(" *") || str.endsWith("*/"))
 
   }
 
