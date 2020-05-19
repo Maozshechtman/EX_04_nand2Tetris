@@ -1,6 +1,5 @@
 package Ex04
 
-class Parsing {
-
+case class Parsing() {
 
 }

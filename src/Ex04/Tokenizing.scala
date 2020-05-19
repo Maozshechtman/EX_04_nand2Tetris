@@ -3,9 +3,9 @@ package Ex04
 import java.io.{File, FileOutputStream, PrintWriter}
 
 import scala.io.Source
-import scala.util.control.Breaks._
+import scala.util.control.Breaks.{break, breakable}
 
-class Tokenizing(jackFile: File = null) {
+case class Tokenizing(jackFile: File = null) {
   //Atribute
   private final val keyWords = Array("class",
 
@@ -15,25 +15,25 @@ class Tokenizing(jackFile: File = null) {
     "field ",
     "static ",
     "var ",
-  "int " ,
-  "char " ,
-  "boolean " ,
-  "void " ,
-  "true " ,
-  "false " ,
-  "null " ,
-  "this " ,
-  "let " ,
-  "do " ,
-  "if " ,
-  "else " ,
-  "while " ,
-  "return ")
-  private final  val symbols=Array("{" , "}" , "(" , ")" , "[" , "]" ,
-    "." ,
-  "," ,
-  ";"
-   ,
+    "int ",
+    "char ",
+    "boolean ",
+    "void ",
+    "true ",
+    "false ",
+    "null ",
+    "this ",
+    "let ",
+    "do ",
+    "if ",
+    "else ",
+    "while ",
+    "return ")
+  private final val symbols = Array("{", "}", "(", ")", "[", "]",
+    ".",
+    ",",
+    ";"
+    ,
     "+",
     "-",
     "*",
@@ -47,11 +47,14 @@ class Tokenizing(jackFile: File = null) {
   private val tokenArray = Array[String]()
 
   def parser(): Unit = {
-
+    //comment case (move to  the next line)
     for (line <- Source.fromFile(jackFile).getLines()) {
       breakable {
         if (line.startsWith("//")) break
-
+        else if (line.startsWith("/*"))
+          while (!line.endsWith("*/")) break
+        else
+          println(line)
       }
 
     }
