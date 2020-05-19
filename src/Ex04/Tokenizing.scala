@@ -50,15 +50,28 @@ case class Tokenizing(jackFile: File = null) {
     //comment case (move to  the next line)
     for (line <- Source.fromFile(jackFile).getLines()) {
       breakable {
+        // case of double back slash
         if (line.startsWith("//")) break
+        else if (line.contains("//")) {
+          lineToTokens(line.split("//")(0))
+
+        }
+
         else if (line.startsWith("/*"))
           while (!line.endsWith("*/")) break
-        else
-          println(line)
-      }
+        else if (line.contains("/*")) {
+          lineToTokens(line.split("/*")(0))
+          while (!line.endsWith("*/")) break
+        }
 
+
+      }
     }
 
+  }
+
+
+  private def lineToTokens(line: String) {
 
   }
 
