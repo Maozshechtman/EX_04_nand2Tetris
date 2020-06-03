@@ -16,6 +16,7 @@ object EX04Main {
     }
     val directory = fileChooser.getSelectedFile.getPath
     readJackFiles(new File(directory))
+
   }
 
   def readJackFiles(directory: File): Unit = {

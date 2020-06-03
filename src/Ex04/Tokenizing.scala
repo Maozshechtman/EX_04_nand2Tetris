@@ -5,7 +5,7 @@ import java.io.{File, FileOutputStream, PrintWriter}
 import scala.io.Source
 import scala.util.control.Breaks._
 case class Tokenizing(jackFile: File = null) {
-  //Atribute
+  //Attributess
   private final val keyWords = Array("class",
 
     "constructor",
@@ -43,11 +43,6 @@ case class Tokenizing(jackFile: File = null) {
     ">",
     "=",
     "~")
-  // regular exprssions
-  val symbolReg = "[\\&\\*\\+\\(\\)\\.\\/\\,\\-\\]\\;\\~\\}\\|\\{\\>\\=\\[\\<]"
-  val intReg = "[0-9]+"
-  val strReg = "\"[^\"\n]*\""
-  val idReg = "[\\w_]+"
   private var tokenArray = Array[String]()
 
   def parser(): Unit = {
@@ -55,7 +50,6 @@ case class Tokenizing(jackFile: File = null) {
     println("read form :" + jackFile.getName)
     val code = removeComments(jackFile)
     tokenArray = code.map(line => lineToTokens(line)).filterNot(_.equals("**ignore**")).toArray
-    println(tokenArray.toSeq)
     writeXMlTokens()
 
   }
