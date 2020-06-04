@@ -4,12 +4,24 @@ import java.io.{File, FileOutputStream, PrintWriter}
 
 import scala.io.Source
 
+//statement:               ifStatement | whileStatement  | letStatement
+//statements:              statements*
+//ifStatement:             keyword('if') symbol('(') expression symbol(')') symbol('{') statements symbol('}')
+//whileStatement:          keyword('while') symbol('(') expression symbol(')') symbol('{') statements symbol('}')
+//letStatement:            varName symbol('=') expression symbol(';')
+//expression:              term (op term)*
+//term:                    identifier | integerConstant
+//op:                      symbol('+' | '-' | '=' | '>' | '<')
+
+
 case class Parsing(TokensFile: File = null) {
   private val targetFileName = TokensFile.getName.replaceAll("TMaG.xml", "AST.xml")
   private val targetASTFile = new File(targetFileName)
   private val listTokens = Source.fromFile(TokensFile).getLines().map(node => new Token().XMLNodeToToken(node)).toSeq
   var AstTree = new NonTerminal()
   private var tokensPointer = 1
+  val operators = Seq("+","-","=","<",">")
+  val terms = Seq("identifier", "integerConstant")
 
   // Non Terminal rules
   def ParseClass(): Unit = {
@@ -153,8 +165,24 @@ case class Parsing(TokensFile: File = null) {
 
   def paresReturnStatement() {}
 
-  def parseExpression(): Unit = {
+  def parseExpression(): NonTerminal = {
+    //expression:              term (op term)*
+    var Expression=new NonTerminal()
+    Expression.addSubrule(parseTerm)
+    while(operators.contains(currentToken())){
+      Expression.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+      Expression.addSubrule(parseTerm)
+    }
+    return Expression
+  }
 
+  //TODO: return/check/fix error nonTerm
+  def parseTerm(): NonTerminal ={
+    var Term=new NonTerminal()
+    if(terms.contains(currentToken())) {
+      Term.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+    }
+    return Term
   }
 
   def writeASTTofile(): Unit = {
