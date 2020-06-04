@@ -20,7 +20,7 @@ case class Parsing(TokensFile: File = null) {
   private val listTokens = Source.fromFile(TokensFile).getLines().map(node => new Token().XMLNodeToToken(node)).toSeq
   var AstTree = new NonTerminal()
   private var tokensPointer = 1
-  val operators = Seq("+","-","=","<",">")
+  val operators = Seq("+", "-", "=", "&lt", "&gt", "&amp")
   val terms = Seq("identifier", "integerConstant")
 
   // Non Terminal rules
@@ -155,7 +155,26 @@ case class Parsing(TokensFile: File = null) {
     }
   }
 
-  def parseLetStament() {}
+  def parseLetStament(): NonTerminal = {
+    var letStatement = new NonTerminal("letStatement")
+    letStatement.addSubrule(new Terminal("keyword", "let"))
+    nextToken // var name
+    letStatement.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+    nextToken // equal or [
+    if (currentToken().getValue.equals("[")) {
+      letStatement.addSubrule(new Terminal("symbol", "["))
+      letStatement.addSubrule(parseExpression())
+      nextToken
+      letStatement.addSubrule(new Terminal("symbol", "]"))
+      nextToken //equal
+    }
+    letStatement.addSubrule(new Terminal("symbol", "="))
+    nextToken // expression
+    letStatement.addSubrule(parseExpression())
+    nextToken //;
+    letStatement.addSubrule(new Terminal("symbol", ";"))
+    return letStatement
+  }
 
   def parseIfStatement() {}
 
@@ -167,9 +186,9 @@ case class Parsing(TokensFile: File = null) {
 
   def parseExpression(): NonTerminal = {
     //expression:              term (op term)*
-    var Expression=new NonTerminal()
+    var Expression = new NonTerminal()
     Expression.addSubrule(parseTerm)
-    while(operators.contains(currentToken())){
+    while (operators.contains(currentToken())) {
       Expression.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
       Expression.addSubrule(parseTerm)
     }
@@ -177,13 +196,14 @@ case class Parsing(TokensFile: File = null) {
   }
 
   //TODO: return/check/fix error nonTerm
-  def parseTerm(): NonTerminal ={
-    var Term=new NonTerminal()
-    if(terms.contains(currentToken())) {
+  def parseTerm(): NonTerminal = {
+    var Term = new NonTerminal()
+    if (terms.contains(currentToken())) {
       Term.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
     }
     return Term
   }
+
 
   def writeASTTofile(): Unit = {
     val writer = new PrintWriter(new FileOutputStream(targetFileName, true))
