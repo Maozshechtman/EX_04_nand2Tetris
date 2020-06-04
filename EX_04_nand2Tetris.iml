@@ -9,5 +9,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="scala-sdk-2.13.1 (2)" level="application" />
     <orderEntry type="library" name="com.github.andyglow:scala-xml-diff_2.11:2.0.2" level="project" />
+    <orderEntry type="library" name="scala-sdk-2.13.1" level="application" />
   </component>
 </module>

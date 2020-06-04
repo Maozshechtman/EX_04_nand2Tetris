@@ -4,12 +4,24 @@ import java.io.{File, FileOutputStream, PrintWriter}
 
 import scala.io.Source
 
+//statement:               ifStatement | whileStatement  | letStatement
+//statements:              statements*
+//ifStatement:             keyword('if') symbol('(') expression symbol(')') symbol('{') statements symbol('}')
+//whileStatement:          keyword('while') symbol('(') expression symbol(')') symbol('{') statements symbol('}')
+//letStatement:            varName symbol('=') expression symbol(';')
+//expression:              term (op term)*
+//term:                    identifier | integerConstant
+//op:                      symbol('+' | '-' | '=' | '>' | '<')
+
+
 case class Parsing(TokensFile: File = null) {
   private val targetFileName = TokensFile.getName.replaceAll("TMaG.xml", "AST.xml")
   private val targetASTFile = new File(targetFileName)
   private val listTokens = Source.fromFile(TokensFile).getLines().map(node => new Token().XMLNodeToToken(node)).toSeq
   var AstTree = new NonTerminal()
   private var tokensPointer = 1
+  val operators = Seq("+","-","=","<",">")
+  val terms = Seq("identifier", "integerConstant")
 
   // Non Terminal rules
   def ParseClass(): Unit = {
@@ -122,65 +134,55 @@ case class Parsing(TokensFile: File = null) {
     }
     varDec.addSubrule(new Terminal("symbol", ";"))
     AstTree.addSubrule(varDec)
-    nextToken // continue parsing
+    nextToken // continue parsing 
   }
 
   def parseStatements(): Unit = {
-    var statments = new NonTerminal("statements")
-    while (Seq("do", "let", "if", "return", "while").contains(currentToken().getValue))
-      parseStatement(statments)
-    AstTree.addSubrule(statments)
+    AstTree += "<statements>\n"
+    while (Seq("do", "let", "if", "return").contains(currentToken().getValue))
+      parseStatment()
+    AstTree += "<statements>\n"
   }
 
-  def parseStatement(root: NonTerminal) {
+  def parseStatment() {
     currentToken().getValue
-
-    root.addSubrule(currentToken() match {
+    match {
       case "let" => parseLetStament()
       case "if" => parseIfStatement()
       case "while" => parseWhileStatement()
       case "do" => parseDoStatement()
       case "return" => paresReturnStatement()
-
-    })
-
-  }
-
-  def parseLetStament(): NonTerminal = {
-    var letStatment = new NonTerminal("letStatment")
-    letStatment.addSubrule(new Terminal("keyword", "let"))
-    nextToken //var Name
-    letStatment.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken // equal or [
-    if (currentToken().getValue.equals("[")) {
-      letStatment.addSubrule(new Terminal("symbol", "["))
-      nextToken
-      letStatment.addSubrule(parseExpression())
-      letStatment.addSubrule(new Terminal("symbol", "]"))
-      nextToken // equal
     }
-    letStatment.addSubrule(new Terminal("symbol", "="))
-    nextToken // experession
-    letStatment.addSubrule(parseExpression())
-    letStatment.addSubrule(new Terminal("symbol", ";"))
-    nextToken
-
-    return letStatment
   }
 
-  def parseIfStatement(): NonTerminal {
+  def parseLetStament() {}
 
-  }
+  def parseIfStatement() {}
 
-  def parseWhileStatement(): NonTerminal {}
+  def parseWhileStatement() {}
 
-  def parseDoStatement(): Terminal {}
+  def parseDoStatement() {}
 
-  def paresReturnStatement(): Terminal {}
+  def paresReturnStatement() {}
 
   def parseExpression(): NonTerminal = {
-    var expression = new NonTerminal("expression")
-    return expression
+    //expression:              term (op term)*
+    var Expression=new NonTerminal()
+    Expression.addSubrule(parseTerm)
+    while(operators.contains(currentToken())){
+      Expression.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+      Expression.addSubrule(parseTerm)
+    }
+    return Expression
+  }
+
+  //TODO: return/check/fix error nonTerm
+  def parseTerm(): NonTerminal ={
+    var Term=new NonTerminal()
+    if(terms.contains(currentToken())) {
+      Term.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+    }
+    return Term
   }
 
   def writeASTTofile(): Unit = {
