@@ -122,39 +122,65 @@ case class Parsing(TokensFile: File = null) {
     }
     varDec.addSubrule(new Terminal("symbol", ";"))
     AstTree.addSubrule(varDec)
-    nextToken // continue parsing 
+    nextToken // continue parsing
   }
 
   def parseStatements(): Unit = {
-    AstTree += "<statements>\n"
-    while (Seq("do", "let", "if", "return").contains(currentToken().getValue))
-      parseStatment()
-    AstTree += "<statements>\n"
+    var statments = new NonTerminal("statements")
+    while (Seq("do", "let", "if", "return", "while").contains(currentToken().getValue))
+      parseStatement(statments)
+    AstTree.addSubrule(statments)
   }
 
-  def parseStatment() {
+  def parseStatement(root: NonTerminal) {
     currentToken().getValue
-    match {
+
+    root.addSubrule(currentToken() match {
       case "let" => parseLetStament()
       case "if" => parseIfStatement()
       case "while" => parseWhileStatement()
       case "do" => parseDoStatement()
       case "return" => paresReturnStatement()
-    }
+
+    })
+
   }
 
-  def parseLetStament() {}
+  def parseLetStament(): NonTerminal = {
+    var letStatment = new NonTerminal("letStatment")
+    letStatment.addSubrule(new Terminal("keyword", "let"))
+    nextToken //var Name
+    letStatment.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+    nextToken // equal or [
+    if (currentToken().getValue.equals("[")) {
+      letStatment.addSubrule(new Terminal("symbol", "["))
+      nextToken
+      letStatment.addSubrule(parseExpression())
+      letStatment.addSubrule(new Terminal("symbol", "]"))
+      nextToken // equal
+    }
+    letStatment.addSubrule(new Terminal("symbol", "="))
+    nextToken // experession
+    letStatment.addSubrule(parseExpression())
+    letStatment.addSubrule(new Terminal("symbol", ";"))
+    nextToken
 
-  def parseIfStatement() {}
+    return letStatment
+  }
 
-  def parseWhileStatement() {}
+  def parseIfStatement(): NonTerminal {
 
-  def parseDoStatement() {}
+  }
 
-  def paresReturnStatement() {}
+  def parseWhileStatement(): NonTerminal {}
 
-  def parseExpression(): Unit = {
+  def parseDoStatement(): Terminal {}
 
+  def paresReturnStatement(): Terminal {}
+
+  def parseExpression(): NonTerminal = {
+    var expression = new NonTerminal("expression")
+    return expression
   }
 
   def writeASTTofile(): Unit = {
