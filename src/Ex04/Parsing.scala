@@ -21,7 +21,8 @@ case class Parsing(TokensFile: File = null) {
   var AstTree = new NonTerminal()
   private var tokensPointer = 1
   val operators = Seq("+", "-", "=", "&lt", "&gt", "&amp")
-  val terms = Seq("identifier", "integerConstant")
+  val terms = Seq("identifier", "integerConstant", "StringConstant")
+  val constKeyword = Seq("null", "this", "true", "false")
 
   // Non Terminal rules
   def ParseClass(): Unit = {
@@ -110,7 +111,7 @@ case class Parsing(TokensFile: File = null) {
     nextToken
     while (currentToken().getValue.equals("var"))
       parseVarDec()
-    parseStatements()
+    subroutineBody.addSubrule(parseStatements())
     subroutineBody.addSubrule(new Terminal("symbol", "}"))
     AstTree.addSubrule(subroutineBody)
     nextToken
@@ -137,22 +138,22 @@ case class Parsing(TokensFile: File = null) {
     nextToken // continue parsing 
   }
 
-  def parseStatements(): Unit = {
-    AstTree += "<statements>\n"
+  def parseStatements(): NonTerminal = {
+    var statments = new NonTerminal("statements")
     while (Seq("do", "let", "if", "return").contains(currentToken().getValue))
-      parseStatment()
-    AstTree += "<statements>\n"
+      parseStatment(statments)
+    return statments
   }
 
-  def parseStatment() {
-    currentToken().getValue
+  def parseStatment(root: NonTerminal) {
+    root.addSubrule(currentToken().getValue
     match {
       case "let" => parseLetStament()
       case "if" => parseIfStatement()
       case "while" => parseWhileStatement()
       case "do" => parseDoStatement()
       case "return" => paresReturnStatement()
-    }
+    })
   }
 
   def parseLetStament(): NonTerminal = {
@@ -176,20 +177,109 @@ case class Parsing(TokensFile: File = null) {
     return letStatement
   }
 
-  def parseIfStatement() {}
+  def parseIfStatement(): NonTerminal = {
+    var ifstatement = new NonTerminal("ifStatement")
+    ifstatement.addSubrule(new Terminal("keyword", "if"))
+    nextToken //(
+    ifstatement.addSubrule(new Terminal("symbol", "("))
+    nextToken //boolean expression
+    ifstatement.addSubrule(parseExpression())
+    ifstatement.addSubrule(new Terminal("symbol", ")"))
+    nextToken
+    ifstatement.addSubrule(new Terminal("symbol", "{"))
+    nextToken
+    //TODO: change return type of Statments to NonTerminal
+    ifstatement.addSubrule(parseStatements())
+    ifstatement.addSubrule(new Terminal("symbol", "}"))
+    nextToken
+    if (currentToken().getValue.equals("else")) {
+      ifstatement.addSubrule(new Terminal("keyword", "else"))
+      nextToken
+      ifstatement.addSubrule(new Terminal("symbol", "{"))
+      nextToken
+      ifstatement.addSubrule(parseStatements())
+      ifstatement.addSubrule(new Terminal("symbol", "}"))
+    }
 
-  def parseWhileStatement() {}
+    return ifstatement
+  }
 
-  def parseDoStatement() {}
+  def parseWhileStatement(): NonTerminal = {
+    var whileStatement = new NonTerminal("whileStatement")
+    nextToken
+    whileStatement.addSubrule(new Terminal("symbol", "("))
+    nextToken
+    whileStatement.addSubrule(parseExpression())
+    whileStatement.addSubrule(new Terminal("symbol", ")"))
+    nextToken
+    whileStatement.addSubrule(new Terminal("symbol", "{"))
+    whileStatement.addSubrule(parseStatements())
+    whileStatement.addSubrule(new Terminal("symbol", "}"))
 
-  def paresReturnStatement() {}
+
+    return whileStatement
+  }
+
+
+  def parseExpressionList(): NonTerminal = {
+    //TODO:complete this rule
+    var expressionList = new NonTerminal("expressionList")
+    expressionList.addSubrule(parseExpression())
+    while (currentToken().getValue.equals(",")) {
+      expressionList.addSubrule(new Terminal("symbol", ","))
+      nextToken
+      expressionList.addSubrule(parseExpression())
+      nextToken // comma or RPRAN
+    }
+    return expressionList
+  }
+
+  def parseSubRoutineCall(doStatement: NonTerminal) = {
+    // subroutine name or class or var name (all are identifiers)
+    doStatement.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+    nextToken //Dot or (
+    if (currentToken().getValue.equals(".")) {
+      doStatement.addSubrule(new Terminal("symbol", "."))
+      nextToken //subroutineName <id>
+      doStatement.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+      nextToken //(
+    }
+    doStatement.addSubrule(new Terminal("symbol", "("))
+    nextToken
+    if (terms.contains(currentToken().getPattern) || constKeyword.contains(currentToken().getValue))
+      doStatement.addSubrule(parseExpressionList())
+    doStatement.addSubrule(new Terminal("symbol", ")"))
+    nextToken // continue parsing
+
+
+  }
+
+  def parseDoStatement(): NonTerminal = {
+    var doStatement = new NonTerminal("doStatement")
+    nextToken //subroutine call (name+parametmeter list)
+    parseSubRoutineCall(doStatement)
+    doStatement.addSubrule(new Terminal("symbol", ";"))
+    return doStatement
+  }
+
+  def paresReturnStatement(): NonTerminal = {
+    var returnStatment = new NonTerminal("returnStatement")
+    returnStatment.addSubrule(new Terminal("keyword", "return"))
+    nextToken // ; or experssion
+    if (!currentToken().getValue.equals(";"))
+      returnStatment.addSubrule(parseExpression())
+    returnStatment.addSubrule(new Terminal("symbol", ";"))
+    return returnStatment
+  }
 
   def parseExpression(): NonTerminal = {
     //expression:              term (op term)*
     var Expression = new NonTerminal()
     Expression.addSubrule(parseTerm)
-    while (operators.contains(currentToken())) {
+    nextToken //operator
+    while (operators.contains(currentToken().getValue)) {
       Expression.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+      nextToken //term
       Expression.addSubrule(parseTerm)
     }
     return Expression
@@ -197,9 +287,34 @@ case class Parsing(TokensFile: File = null) {
 
   //TODO: return/check/fix error nonTerm
   def parseTerm(): NonTerminal = {
-    var Term = new NonTerminal()
-    if (terms.contains(currentToken())) {
-      Term.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+    var Term = new NonTerminal("term")
+    if (terms.contains(currentToken().getPattern)) {
+      if (listTokens(tokensPointer + 1).getValue.equals("("))
+        parseSubRoutineCall(Term)
+      else {
+        Term.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
+        nextToken //
+      }
+
+      if (currentToken().getValue.equals("[")) {
+        Term.addSubrule(new Terminal("symbol", "["))
+        Term.addSubrule(parseExpression())
+        Term.addSubrule(new Terminal("symbol", "]"))
+      }
+    }
+    else //'(' or unaryOp
+    {
+      if (currentToken().getValue.equals("(")) {
+        Term.addSubrule(new Terminal("symbol", "("))
+        nextToken
+        Term.addSubrule(parseExpression())
+        nextToken
+        Term.addSubrule(new Terminal("symbol", ")"))
+      }
+      else //UnaryOP
+      {
+        Term.addSubrule(new Terminal(currentToken().getValue, currentToken().getValue))
+      }
     }
     return Term
   }
