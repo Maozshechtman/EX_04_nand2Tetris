@@ -176,6 +176,8 @@ case class Tokenizing(jackFile: File = null) {
     val writer = new PrintWriter(new FileOutputStream(fileName, true))
     writer.append(root)
     writer.close()
+    var syntexAnalyzer = new Parsing(new File(fileName))
+    syntexAnalyzer.Parse()
 
   }
 

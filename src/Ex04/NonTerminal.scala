@@ -1,7 +1,8 @@
 package Ex04
 
+
 class NonTerminal extends Rule {
-  var subRules: Seq[Rule] = Seq()
+  private var subRules: List[Rule] = List()
 
   def this(rule: String) {
     this()
@@ -9,10 +10,11 @@ class NonTerminal extends Rule {
   }
 
   def addSubrule(rule: Rule): Unit = {
-    subRules +: Seq(rule)
+    subRules = this.subRules :+ rule
   }
 
-  override def RuletoXml: String =
-    return "<" + ruleName + ">\n" + subRules.map(rule => rule.RuletoXml) + "</" + ruleName + ">\n"
+  override def RuletoXml: String = {
+    return "<" + ruleName + ">\n" + subRules.map(rule => rule.RuletoXml).mkString + "</" + ruleName + ">\n"
+  }
 
 }

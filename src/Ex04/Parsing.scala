@@ -15,137 +15,191 @@ import scala.io.Source
 
 
 case class Parsing(TokensFile: File = null) {
-  private val targetFileName = TokensFile.getName.replaceAll("TMaG.xml", "AST.xml")
+  private val targetFileName = TokensFile.getPath.replaceAll("TMaG.xml", "AST.xml")
   private val targetASTFile = new File(targetFileName)
   private val listTokens = Source.fromFile(TokensFile).getLines().map(node => new Token().XMLNodeToToken(node)).toSeq
-  var AstTree = new NonTerminal()
+  private val operators = Seq("+", "-", "=", "&lt;", "&gt;", "&amp;", "/", "|", "*")
+  private val terms = Seq("identifier", "integerConstant", "stringConstant")
+  private val constKeyword = Seq("null", "this", "true", "false")
+  private val unaryOperators = Seq("~", "-")
+  private var AstTree = new NonTerminal()
   private var tokensPointer = 1
-  val operators = Seq("+", "-", "=", "&lt", "&gt", "&amp")
-  val terms = Seq("identifier", "integerConstant", "StringConstant")
-  val constKeyword = Seq("null", "this", "true", "false")
+
+  //Parsing tools
+  def lookAhead(): Token = {
+    if (tokensPointer + 1 < listTokens.length - 1)
+      return listTokens(tokensPointer + 1)
+    else
+      return currentToken()
+  }
 
   // Non Terminal rules
-  def ParseClass(): Unit = {
-    AstTree = new NonTerminal("class")
-    nextToken //class name
-    AstTree.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken //{
-    AstTree addSubrule (new Terminal("symbol", "{"))
+  def Parse(): Unit = {
+    ParseClass()
+    writeASTTofile()
+  }
+
+  def parseStatements(): NonTerminal = {
+    var statments = new NonTerminal("statements")
+    while (Seq("do", "let", "if", "return", "while").contains(currentToken().getValue)) {
+      parseStatment(statments)
+    }
+    return statments
+  }
+
+  //terminal rules
+  private def parseClassName(className: String): Terminal = {
     nextToken
-    while (Seq("static", "filed").contains(currentToken().getValue))
-      ParseClassVarDec()
+    return new Terminal("identifier", className)
+  }
 
-    while (Seq("constructor", "method", "function").contains(currentToken().getValue))
-      ParseSubroutineDec()
-    AstTree.addSubrule(new Terminal("symbol", "}"))
+  private def parseVarName(name: String): Terminal = {
+    nextToken
+    return new Terminal("identifier", name)
+  }
 
+  private def parseSunbRoutineName(subRoutineName: String): Terminal = {
+    nextToken
+    return new Terminal("identifier", subRoutineName)
 
   }
+
+  private def parseType(varType: Token): Terminal = {
+    nextToken
+    return new Terminal(varType.getPattern, varType.getValue)
+  }
+
+  private def parseKeyword(keyword: String): Terminal = {
+    nextToken
+    return new Terminal("keyword", keyword)
+  }
+
+  private def parseSymbol(symbol: String): Terminal = {
+    nextToken
+    return new Terminal("symbol", symbol)
+  }
+
+  private def parseStringConstant(str: String): Terminal = {
+    nextToken
+    return new Terminal("stringConstant", str)
+  }
+
+  private def parseintegerConstant(number: String): Terminal = {
+    nextToken
+    return new Terminal("integerConstant", number)
+  }
+
+  new Terminal()
 
   private def currentToken(): Token = return listTokens(tokensPointer)
-
-  def ParseClassVarDec() {
-    var classVarDec = new NonTerminal("classVaeDec")
-    nextToken // class var type (id or keyword)
-    classVarDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken // Var Name
-    classVarDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken // comma or semi-colom
-    while (currentToken().getValue.equals(",")) {
-      classVarDec.addSubrule(new Terminal("symbol", ","))
-      nextToken // Var Name
-      classVarDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-      nextToken // semi colom or comma
-      AstTree.addSubrule(classVarDec)
-    }
-    AstTree.addSubrule(new Terminal("symbol", ";")) //endOfrule
-    nextToken //continue parsing
-
-  }
 
   private def nextToken {
     if (tokensPointer < listTokens.length - 1)
       tokensPointer += 1
   }
 
-  def ParseSubroutineDec(): Unit = {
-    var subroutineDec = new NonTerminal("subroutineDec")
-    subroutineDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue)) // method|function|constarctor
-    nextToken // return type (keyword or id )
-    subroutineDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken //subroutineDec
-    subroutineDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken //(
-    subroutineDec.addSubrule(new Terminal("symbol", "("))
-    parsePrametersList()
-    nextToken //)
-    subroutineDec.addSubrule(new Terminal("symbol", ")"))
-    parseSubroutineBody()
-    AstTree.addSubrule(subroutineDec)
-    nextToken // continue parsing
-  }
-
-  def parsePrametersList() = {
-    var parameterList = new NonTerminal("parameterList")
-    nextToken // if the subroutine have prameters
-    if (!currentToken().getPattern.equals("symbol")) {
-      parameterList.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue)) //var type
-      nextToken // var name
-      parameterList.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-      nextToken // comma or RPRAN
-      while (currentToken().getValue.equals(",")) {
-        parameterList.addSubrule(new Terminal("symbol", ","))
-        nextToken //var type
-        parameterList.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-        nextToken
-        AstTree.addSubrule(parameterList)
-      }
+  private def ParseClass(): Unit = {
+    AstTree = new NonTerminal("class")
+    AstTree.addSubrule(parseKeyword("class"))
+    AstTree.addSubrule(parseClassName(currentToken().getValue))
+    AstTree addSubrule (parseSymbol("{"))
+    while (Seq("static", "field").contains(currentToken().getValue)) {
+      AstTree.addSubrule(ParseClassVarDec())
     }
-    AstTree += "</parameterList>"
+    while (Seq("constructor", "method", "function").contains(currentToken().getValue)) {
+      ParseSubroutineDec()
+    }
+    AstTree.addSubrule(parseSymbol("}"))
+
+
   }
 
-  def parseSubroutineBody() = {
+  private def ParseClassVarDec(): NonTerminal = {
+    var classVarDec = new NonTerminal("classVarDec")
+    classVarDec.addSubrule(parseKeyword(currentToken().getValue))
+    classVarDec.addSubrule(parseType(currentToken()))
+    classVarDec.addSubrule(parseVarName(currentToken().getValue))
+    while (currentToken().getValue.equals(",")) {
+      classVarDec.addSubrule(parseSymbol(","))
+      classVarDec.addSubrule(parseVarName(currentToken().getValue))
+    }
+    classVarDec.addSubrule(parseSymbol(";"))
+    //endOfrule
+    return classVarDec
+
+  }
+
+  private def ParseSubroutineDec(): Unit = {
+    var subroutineDec = new NonTerminal("subroutineDec")
+    // method|function|constarctor
+    subroutineDec.addSubrule(parseKeyword(currentToken().getValue))
+    //return type
+    subroutineDec.addSubrule(parseType(currentToken()))
+    //subroutine name
+    subroutineDec.addSubrule(parseSunbRoutineName(currentToken().getValue))
+    //(
+    subroutineDec.addSubrule(parseSymbol("("))
+    //Parameter List
+    subroutineDec.addSubrule(parsePrametersList())
+    subroutineDec.addSubrule(parseSymbol(")"))
+    subroutineDec.addSubrule(parseSubroutineBody())
+    AstTree.addSubrule(subroutineDec)
+  }
+
+  private def parsePrametersList(): NonTerminal = {
+    var parameterList = new NonTerminal("parameterList")
+    if (!currentToken().getValue.equals(")")) {
+      //var type
+      parameterList.addSubrule(parseType(currentToken()))
+      // var name
+      parameterList.addSubrule(parseVarName(currentToken().getValue))
+      // comma or RPRAN
+      while (currentToken().getValue.equals(",")) {
+        parameterList.addSubrule(parseSymbol(","))
+        //var type
+        parameterList.addSubrule(parseType(currentToken()))
+        //varName
+        parameterList.addSubrule(parseVarName(currentToken().getValue))
+
+
+      }
+
+    }
+    return parameterList
+  }
+
+  private def parseSubroutineBody(): NonTerminal = {
     var subroutineBody = new NonTerminal("subroutineBody")
-    nextToken //{
-    subroutineBody.addSubrule(new Terminal("symbol", "{"))
-    nextToken
+    //{
+    subroutineBody.addSubrule(parseSymbol("{"))
     while (currentToken().getValue.equals("var"))
-      parseVarDec()
+      subroutineBody.addSubrule(parseVarDec())
     subroutineBody.addSubrule(parseStatements())
-    subroutineBody.addSubrule(new Terminal("symbol", "}"))
-    AstTree.addSubrule(subroutineBody)
-    nextToken
+    subroutineBody.addSubrule(parseSymbol("}"))
+    return subroutineBody
+
 
   }
 
-  def parseVarDec(): Unit = {
+  private def parseVarDec(): NonTerminal = {
     var varDec = new NonTerminal("varDec")
     // keyword var
-    varDec.addSubrule(new Terminal("keyword", "var"))
-    nextToken //var type (id or keyword)
-    varDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken // var name
-    varDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken // comma or semicolon
+    varDec.addSubrule(parseKeyword("var"))
+    //var type (id or keyword)
+    varDec.addSubrule(parseType(currentToken()))
+    // var name
+    varDec.addSubrule(parseVarName(currentToken().getValue))
+    // comma or semicolon
     while (currentToken().getValue.equals(",")) {
-      varDec.addSubrule(new Terminal("symbol", ","))
-      nextToken // var name
-      varDec.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-      nextToken
+      varDec.addSubrule(parseSymbol(","))
+      varDec.addSubrule(parseVarName(currentToken().getValue))
     }
-    varDec.addSubrule(new Terminal("symbol", ";"))
-    AstTree.addSubrule(varDec)
-    nextToken // continue parsing 
+    varDec.addSubrule(parseSymbol(";"))
+    return varDec
+
   }
 
-  def parseStatements(): NonTerminal = {
-    var statments = new NonTerminal("statements")
-    while (Seq("do", "let", "if", "return").contains(currentToken().getValue))
-      parseStatment(statments)
-    return statments
-  }
-
-  def parseStatment(root: NonTerminal) {
+  private def parseStatment(root: NonTerminal) {
     root.addSubrule(currentToken().getValue
     match {
       case "let" => parseLetStament()
@@ -156,171 +210,178 @@ case class Parsing(TokensFile: File = null) {
     })
   }
 
-  def parseLetStament(): NonTerminal = {
+  private def parseLetStament(): NonTerminal = {
     var letStatement = new NonTerminal("letStatement")
-    letStatement.addSubrule(new Terminal("keyword", "let"))
-    nextToken // var name
-    letStatement.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken // equal or [
+    letStatement.addSubrule(parseKeyword("let"))
+    // var name
+    letStatement.addSubrule(parseVarName(currentToken().getValue))
+    // equal or [
     if (currentToken().getValue.equals("[")) {
-      letStatement.addSubrule(new Terminal("symbol", "["))
+      letStatement.addSubrule(parseSymbol("["))
       letStatement.addSubrule(parseExpression())
-      nextToken
-      letStatement.addSubrule(new Terminal("symbol", "]"))
-      nextToken //equal
+
+      letStatement.addSubrule(parseSymbol("]"))
+
     }
-    letStatement.addSubrule(new Terminal("symbol", "="))
-    nextToken // expression
+    letStatement.addSubrule(parseSymbol("="))
     letStatement.addSubrule(parseExpression())
-    nextToken //;
-    letStatement.addSubrule(new Terminal("symbol", ";"))
+    letStatement.addSubrule(parseSymbol(";"))
     return letStatement
   }
 
-  def parseIfStatement(): NonTerminal = {
+  private def parseIfStatement(): NonTerminal = {
     var ifstatement = new NonTerminal("ifStatement")
-    ifstatement.addSubrule(new Terminal("keyword", "if"))
-    nextToken //(
-    ifstatement.addSubrule(new Terminal("symbol", "("))
-    nextToken //boolean expression
+    ifstatement.addSubrule(parseKeyword("if"))
+    //(
+    ifstatement.addSubrule(parseSymbol("("))
+    //boolean expression
     ifstatement.addSubrule(parseExpression())
-    ifstatement.addSubrule(new Terminal("symbol", ")"))
-    nextToken
-    ifstatement.addSubrule(new Terminal("symbol", "{"))
-    nextToken
-    //TODO: change return type of Statments to NonTerminal
+    //)
+    ifstatement.addSubrule(parseSymbol(")"))
+    ifstatement.addSubrule(parseSymbol("{"))
     ifstatement.addSubrule(parseStatements())
-    ifstatement.addSubrule(new Terminal("symbol", "}"))
-    nextToken
+    ifstatement.addSubrule(parseSymbol("}"))
     if (currentToken().getValue.equals("else")) {
-      ifstatement.addSubrule(new Terminal("keyword", "else"))
-      nextToken
-      ifstatement.addSubrule(new Terminal("symbol", "{"))
-      nextToken
+      ifstatement.addSubrule(parseKeyword("else"))
+      ifstatement.addSubrule(parseSymbol("{"))
       ifstatement.addSubrule(parseStatements())
-      ifstatement.addSubrule(new Terminal("symbol", "}"))
+      ifstatement.addSubrule(parseSymbol("}"))
     }
 
     return ifstatement
   }
 
-  def parseWhileStatement(): NonTerminal = {
+  private def parseWhileStatement(): NonTerminal = {
     var whileStatement = new NonTerminal("whileStatement")
-    nextToken
-    whileStatement.addSubrule(new Terminal("symbol", "("))
-    nextToken
+    whileStatement.addSubrule(parseKeyword("while"))
+    whileStatement.addSubrule(parseSymbol("("))
     whileStatement.addSubrule(parseExpression())
-    whileStatement.addSubrule(new Terminal("symbol", ")"))
-    nextToken
-    whileStatement.addSubrule(new Terminal("symbol", "{"))
+    whileStatement.addSubrule(parseSymbol(")"))
+    whileStatement.addSubrule(parseSymbol("{"))
+    // add Statments
     whileStatement.addSubrule(parseStatements())
-    whileStatement.addSubrule(new Terminal("symbol", "}"))
-
-
+    whileStatement.addSubrule(parseSymbol("}"))
     return whileStatement
   }
 
 
-  def parseExpressionList(): NonTerminal = {
-    //TODO:complete this rule
+  private def parseExpressionList(): NonTerminal = {
     var expressionList = new NonTerminal("expressionList")
+    if (currentToken().getValue.equals(")"))
+      return expressionList
     expressionList.addSubrule(parseExpression())
+    if (currentToken().getValue.equals(")"))
+      return expressionList
     while (currentToken().getValue.equals(",")) {
-      expressionList.addSubrule(new Terminal("symbol", ","))
-      nextToken
+      expressionList.addSubrule(parseSymbol(","))
       expressionList.addSubrule(parseExpression())
-      nextToken // comma or RPRAN
+
     }
     return expressionList
   }
 
-  def parseSubRoutineCall(doStatement: NonTerminal) = {
-    // subroutine name or class or var name (all are identifiers)
-    doStatement.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-    nextToken //Dot or (
+  private def parseSubRoutineCall(doStatement: NonTerminal) = {
+    // SubroutineName| classNmae | Varname (all are identifiers)
+    doStatement.addSubrule(parseVarName(currentToken().getValue))
+    //Dot or (
     if (currentToken().getValue.equals(".")) {
-      doStatement.addSubrule(new Terminal("symbol", "."))
-      nextToken //subroutineName <id>
-      doStatement.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-      nextToken //(
+      doStatement.addSubrule(parseSymbol("."))
+      doStatement.addSubrule(parseSunbRoutineName(currentToken().getValue))
     }
-    doStatement.addSubrule(new Terminal("symbol", "("))
-    nextToken
-    if (terms.contains(currentToken().getPattern) || constKeyword.contains(currentToken().getValue))
-      doStatement.addSubrule(parseExpressionList())
-    doStatement.addSubrule(new Terminal("symbol", ")"))
-    nextToken // continue parsing
-
+    doStatement.addSubrule(parseSymbol("("))
+    doStatement.addSubrule(parseExpressionList())
+    doStatement.addSubrule(parseSymbol(")"))
 
   }
 
-  def parseDoStatement(): NonTerminal = {
+  private def parseDoStatement(): NonTerminal = {
     var doStatement = new NonTerminal("doStatement")
-    nextToken //subroutine call (name+parametmeter list)
+    doStatement.addSubrule(parseKeyword("do"))
+    //subroutine call (name+parametmeter list)
     parseSubRoutineCall(doStatement)
-    doStatement.addSubrule(new Terminal("symbol", ";"))
+    doStatement.addSubrule(parseSymbol(";"))
     return doStatement
   }
 
-  def paresReturnStatement(): NonTerminal = {
+  private def paresReturnStatement(): NonTerminal = {
     var returnStatment = new NonTerminal("returnStatement")
-    returnStatment.addSubrule(new Terminal("keyword", "return"))
-    nextToken // ; or experssion
+    returnStatment.addSubrule(parseKeyword("return"))
+    // ; or experssion
     if (!currentToken().getValue.equals(";"))
       returnStatment.addSubrule(parseExpression())
-    returnStatment.addSubrule(new Terminal("symbol", ";"))
+    returnStatment.addSubrule(parseSymbol(";"))
     return returnStatment
   }
 
-  def parseExpression(): NonTerminal = {
+  private def parseExpression(): NonTerminal = {
     //expression:              term (op term)*
-    var Expression = new NonTerminal()
+    var Expression = new NonTerminal("expression")
     Expression.addSubrule(parseTerm)
-    nextToken //operator
-    while (operators.contains(currentToken().getValue)) {
-      Expression.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-      nextToken //term
-      Expression.addSubrule(parseTerm)
+    if (operators.contains(currentToken().getValue)) {
+      while (operators.contains(currentToken().getValue)) {
+        //op=symbol
+        Expression.addSubrule(parseSymbol(currentToken().getValue))
+        //term
+        Expression.addSubrule(parseTerm)
+      }
     }
     return Expression
   }
 
-  //TODO: return/check/fix error nonTerm
-  def parseTerm(): NonTerminal = {
-    var Term = new NonTerminal("term")
-    if (terms.contains(currentToken().getPattern)) {
-      if (listTokens(tokensPointer + 1).getValue.equals("("))
-        parseSubRoutineCall(Term)
-      else {
-        Term.addSubrule(new Terminal(currentToken().getPattern, currentToken().getValue))
-        nextToken //
-      }
 
+  private def parseTerm(): NonTerminal = {
+    var Term = new NonTerminal("term")
+    //KeywordCase={null,true,false,this}=keyword
+    if (constKeyword.contains(currentToken().getValue)) {
+      Term.addSubrule(parseKeyword(currentToken().getValue))
+      return Term
+    }
+    //String constant
+    if (currentToken().getPattern.equals("stringConstant")) {
+      Term.addSubrule(parseStringConstant(currentToken().getValue))
+      return Term
+    }
+    //integerConstant
+    if (currentToken().getPattern.equals("integerConstant")) {
+      Term.addSubrule(parseintegerConstant(currentToken().getValue))
+      return Term
+    }
+    //varName|VarNameExpression|.SubRoutineName
+    if (currentToken().getPattern.equals("identifier")) {
+      //subRoutineCall
+      if (lookAhead().getValue.equals(".") || lookAhead().getValue.equals("(")) {
+        parseSubRoutineCall(Term)
+        return Term
+      }
+      Term.addSubrule(parseVarName(currentToken().getValue))
       if (currentToken().getValue.equals("[")) {
-        Term.addSubrule(new Terminal("symbol", "["))
+        Term.addSubrule(parseSymbol("["))
         Term.addSubrule(parseExpression())
-        Term.addSubrule(new Terminal("symbol", "]"))
+        Term.addSubrule(parseSymbol("]"))
       }
+      return Term
     }
-    else //'(' or unaryOp
-    {
-      if (currentToken().getValue.equals("(")) {
-        Term.addSubrule(new Terminal("symbol", "("))
-        nextToken
-        Term.addSubrule(parseExpression())
-        nextToken
-        Term.addSubrule(new Terminal("symbol", ")"))
-      }
-      else //UnaryOP
-      {
-        Term.addSubrule(new Terminal(currentToken().getValue, currentToken().getValue))
-      }
+    //(expression)
+    else if (currentToken().getValue.equals("(")) {
+      Term.addSubrule(parseSymbol("("))
+      Term.addSubrule(parseExpression())
+      Term.addSubrule(parseSymbol(")"))
+      return Term
+
     }
-    return Term
+    //Unary op
+    else {
+      Term.addSubrule(parseSymbol(currentToken().getValue))
+      Term.addSubrule(parseTerm())
+      return Term
+
+
+    }
+
   }
 
 
-  def writeASTTofile(): Unit = {
+  private def writeASTTofile(): Unit = {
     val writer = new PrintWriter(new FileOutputStream(targetFileName, true))
     writer.append(AstTree.RuletoXml)
     writer.close()
@@ -332,11 +393,16 @@ case class Parsing(TokensFile: File = null) {
     def getValue = value
 
     def XMLNodeToToken(xmlNode: String): Token = {
-      val spilled = xmlNode.split("<_>")
-      return new Token(spilled(1), spilled(2))
+      if (xmlNode.equals("<tokens>") || xmlNode.equals("</tokens>"))
+        return null
+      else {
+        val spilled = xmlNode.split("[<_>]")
+        return new Token(spilled(1), spilled(2).trim)
+      }
+
     }
 
-    override def toString: String = "<" + pattern + "> " + value + " </" + pattern + ">" + "/n"
+    override def toString: String = "<" + pattern + "> " + value + " </" + pattern + ">" + "\n"
 
 
   }

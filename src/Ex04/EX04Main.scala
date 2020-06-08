@@ -17,11 +17,12 @@ object EX04Main {
     val directory = fileChooser.getSelectedFile.getPath
     readJackFiles(new File(directory))
 
+
   }
 
   def readJackFiles(directory: File): Unit = {
+    deletemyFIles(directory)
     val files = directory.listFiles().filter(x => x.getName.endsWith(".jack")) //get all files finsh with "jack"
-
     for (file <- files) {
       val x = Tokenizing(file)
       x.parser()
@@ -30,6 +31,12 @@ object EX04Main {
     }
   }
 
+  def deletemyFIles(directory: File): Unit = {
+    var AstFiles = directory.listFiles().filter(file => file.getName.contains("AST") || file.getName.contains("MaG")).toSeq
+    for (file <- AstFiles) {
+      file.delete()
+    }
+  }
 
 
 }

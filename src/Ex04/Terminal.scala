@@ -11,7 +11,7 @@ class Terminal extends Rule {
   }
 
   override def RuletoXml: String = {
-    return "<" + ruleName + ">\n" + terminalName + "</" + ruleName + ">\n"
+    return "<" + ruleName + ">" + terminalName + "</" + ruleName + ">\n"
   }
 
 }
