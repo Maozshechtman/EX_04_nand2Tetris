@@ -2,6 +2,7 @@ package Ex04
 
 import java.io.{File, FileOutputStream, PrintWriter}
 
+import scala.collection.mutable.ListBuffer
 import scala.io.Source
 
 //statement:               ifStatement | whileStatement  | letStatement
@@ -13,6 +14,12 @@ import scala.io.Source
 //term:                    identifier | integerConstant
 //op:                      symbol('+' | '-' | '=' | '>' | '<')
 
+//symbols:
+//name(identifier)
+//type(int, char, boolean, className)
+//kind(field, static, local(var), argument)
+//scope(class, subroutine)
+
 
 case class Parsing(TokensFile: File = null) {
   private val targetFileName = TokensFile.getPath.replaceAll("TMaG.xml", "AST.xml")
@@ -22,8 +29,20 @@ case class Parsing(TokensFile: File = null) {
   private val terms = Seq("identifier", "integerConstant", "stringConstant")
   private val constKeyword = Seq("null", "this", "true", "false")
   private val unaryOperators = Seq("~", "-")
+
   private var AstTree = new NonTerminal()
   private var tokensPointer = 1
+
+  //code generation vars
+  private val classSymbolTable  = ListBuffer()
+  private val subRoutineSymbolTable = ListBuffer()
+  private var fieldCounter=0
+  private var staticCounter=0
+  private var localCounter=0
+  private var argCounter=0
+
+  private var className=""
+
 
   //Parsing tools
   def lookAhead(): Token = {
@@ -101,29 +120,68 @@ case class Parsing(TokensFile: File = null) {
   private def ParseClass(): Unit = {
     AstTree = new NonTerminal("class")
     AstTree.addSubrule(parseKeyword("class"))
+    className=currentToken().getValue
     AstTree.addSubrule(parseClassName(currentToken().getValue))
     AstTree addSubrule (parseSymbol("{"))
     while (Seq("static", "field").contains(currentToken().getValue)) {
       AstTree.addSubrule(ParseClassVarDec())
     }
+    //after parsing the vars reset their counters
+    fieldCounter=0
+    staticCounter=0
+
     while (Seq("constructor", "method", "function").contains(currentToken().getValue)) {
       ParseSubroutineDec()
     }
     AstTree.addSubrule(parseSymbol("}"))
+    className=""
+    fieldCounter=0
+    staticCounter=0
+
+    //empty the class symbol table, we finished using it
+    classSymbolTable.clear()
 
 
   }
 
   private def ParseClassVarDec(): NonTerminal = {
     var classVarDec = new NonTerminal("classVarDec")
+    //ex: field int x, y;
+    val symbolKind = currentToken().getValue
     classVarDec.addSubrule(parseKeyword(currentToken().getValue))
+    val symbolType = currentToken().getValue
     classVarDec.addSubrule(parseType(currentToken()))
+    val symbolName = currentToken().getValue
     classVarDec.addSubrule(parseVarName(currentToken().getValue))
+
+    //deciding the counter of the symbol kind
+    var index=0
+    if(symbolKind=="field"){
+      index=fieldCounter
+    }
+    else{//symbolkind=="static"
+      index=staticCounter
+    }
+
+    //add first var in line to symbol table
+    classSymbolTable.appended(new Symbol(symbolType,symbolKind,symbolName,index))
+    index+=1
+
     while (currentToken().getValue.equals(",")) {
       classVarDec.addSubrule(parseSymbol(","))
       classVarDec.addSubrule(parseVarName(currentToken().getValue))
+
+      //add consecutive var to symbol table
+      classSymbolTable.appended(new Symbol(symbolType,symbolKind,symbolName,index))
+      index+=1
     }
     classVarDec.addSubrule(parseSymbol(";"))
+    if(symbolKind=="field"){
+      fieldCounter=index
+    }
+    else{//symbolkind=="static"
+      staticCounter=index
+    }
     //endOfrule
     return classVarDec
 
@@ -132,6 +190,7 @@ case class Parsing(TokensFile: File = null) {
   private def ParseSubroutineDec(): Unit = {
     var subroutineDec = new NonTerminal("subroutineDec")
     // method|function|constarctor
+    val subRoutineKind=currentToken().getValue
     subroutineDec.addSubrule(parseKeyword(currentToken().getValue))
     //return type
     subroutineDec.addSubrule(parseType(currentToken()))
@@ -140,8 +199,15 @@ case class Parsing(TokensFile: File = null) {
     //(
     subroutineDec.addSubrule(parseSymbol("("))
     //Parameter List
+    var argCounter=0
+    if(subRoutineKind=="method") {
+      //add "this" to the subroutine symbol table
+      subRoutineSymbolTable.appended(new Symbol("this", className, "argument", argCounter))
+      argCounter += 1
+    }
     subroutineDec.addSubrule(parsePrametersList())
     subroutineDec.addSubrule(parseSymbol(")"))
+    argCounter=0
     subroutineDec.addSubrule(parseSubroutineBody())
     AstTree.addSubrule(subroutineDec)
   }
@@ -150,18 +216,26 @@ case class Parsing(TokensFile: File = null) {
     var parameterList = new NonTerminal("parameterList")
     if (!currentToken().getValue.equals(")")) {
       //var type
+      var symbolType=currentToken().getValue
       parameterList.addSubrule(parseType(currentToken()))
       // var name
+      var symbolName = currentToken().getValue
       parameterList.addSubrule(parseVarName(currentToken().getValue))
+      val symbolKind ="argument"
+      subRoutineSymbolTable.appended(new Symbol(symbolName, symbolType, symbolKind, argCounter))
+      argCounter+=1
       // comma or RPRAN
       while (currentToken().getValue.equals(",")) {
         parameterList.addSubrule(parseSymbol(","))
         //var type
+        symbolType=currentToken().getValue
         parameterList.addSubrule(parseType(currentToken()))
         //varName
+        symbolName = currentToken().getValue
         parameterList.addSubrule(parseVarName(currentToken().getValue))
 
-
+        subRoutineSymbolTable.appended(new Symbol(symbolName, symbolType, symbolKind, argCounter))
+        argCounter+=1
       }
 
     }
@@ -172,10 +246,12 @@ case class Parsing(TokensFile: File = null) {
     var subroutineBody = new NonTerminal("subroutineBody")
     //{
     subroutineBody.addSubrule(parseSymbol("{"))
+    localCounter=0
     while (currentToken().getValue.equals("var"))
       subroutineBody.addSubrule(parseVarDec())
     subroutineBody.addSubrule(parseStatements())
     subroutineBody.addSubrule(parseSymbol("}"))
+    localCounter=0
     return subroutineBody
 
 
@@ -186,13 +262,24 @@ case class Parsing(TokensFile: File = null) {
     // keyword var
     varDec.addSubrule(parseKeyword("var"))
     //var type (id or keyword)
+    var symbolType=currentToken().getValue
     varDec.addSubrule(parseType(currentToken()))
     // var name
+    var symbolName = currentToken().getValue
     varDec.addSubrule(parseVarName(currentToken().getValue))
+
+    val symbolKind="local"
+    subRoutineSymbolTable.appended(new Symbol(symbolName, symbolType, symbolKind, localCounter))
+    localCounter+=1
+
     // comma or semicolon
     while (currentToken().getValue.equals(",")) {
       varDec.addSubrule(parseSymbol(","))
+      symbolName = currentToken().getValue
       varDec.addSubrule(parseVarName(currentToken().getValue))
+
+      subRoutineSymbolTable.appended(new Symbol(symbolName, symbolType, symbolKind, localCounter))
+      localCounter+=1
     }
     varDec.addSubrule(parseSymbol(";"))
     return varDec
