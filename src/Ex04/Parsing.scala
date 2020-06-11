@@ -29,7 +29,6 @@ case class Parsing(TokensFile: File = null) {
   private val terms = Seq("identifier", "integerConstant", "stringConstant")
   private val constKeyword = Seq("null", "this", "true", "false")
   private val unaryOperators = Seq("~", "-")
-
   private var AstTree = new NonTerminal()
   private var tokensPointer = 1
 
